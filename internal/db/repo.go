@@ -58,12 +58,13 @@ func (r *Repository) CreateMessage(ctx context.Context, nationalID string, role 
 	return &m, nil
 }
 
-// GetTranscript returns all messages for a user ordered by creation time.
+// GetTranscript returns messages from the last week for a user ordered by creation time.
 func (r *Repository) GetTranscript(ctx context.Context, nationalID string) ([]pkg.Message, error) {
 	rows, err := r.DB.QueryContext(ctx,
 		`SELECT id, national_id, role, content, created_at
          FROM messages
          WHERE national_id = $1
+           AND created_at >= NOW() - INTERVAL '7 days'
          ORDER BY created_at ASC`, nationalID)
 	if err != nil {
 		return nil, err

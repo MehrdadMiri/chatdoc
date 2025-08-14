@@ -133,7 +133,7 @@ func (s *Server) handlePostMessage(w http.ResponseWriter, r *http.Request, natio
 		// send cap message only
 		botMsg, _ := s.Repo.CreateMessage(r.Context(), nationalID, pkg.RoleBot, core.CapMessage)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write([]byte(`<div class="message bot">` + template.HTMLEscapeString(botMsg.Content) + `</div>`))
+		w.Write([]byte(`<div class="msg bot">` + template.HTMLEscapeString(botMsg.Content) + `</div>`))
 		return
 	}
 	// store patient message
@@ -148,5 +148,5 @@ func (s *Server) handlePostMessage(w http.ResponseWriter, r *http.Request, natio
 	}
 	escReply := template.HTMLEscapeString(reply)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(`<div class="message bot">` + escReply + `</div>`))
+	w.Write([]byte(`<div class="msg bot">` + escReply + `</div>`))
 }
