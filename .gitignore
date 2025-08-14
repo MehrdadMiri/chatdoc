@@ -12,7 +12,6 @@
 # Go build cache & module cache
 *.out
 *.log
-go.sum
 vendor/
 
 # IDE/editor junk
