@@ -29,7 +29,7 @@
 
     <form id="chatForm"
           class="composer"
-          hx-post="/api/sessions/{{ .SessionID }}/messages"
+          hx-post="/api/users/{{ .SessionID }}/messages"
           hx-trigger="submit"
           hx-target="#messages"
           hx-swap="beforeend"
