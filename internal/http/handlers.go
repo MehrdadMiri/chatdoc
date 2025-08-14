@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"waitroom-chatbot/internal/core"
 	"waitroom-chatbot/internal/db"
@@ -54,6 +55,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // handleStartPage renders the initial form for collecting user details.
 func (s *Server) handleStartPage(w http.ResponseWriter, r *http.Request) {
+	if c, err := r.Cookie("national_id"); err == nil && c.Value != "" {
+		http.Redirect(w, r, "/chat/"+c.Value, http.StatusSeeOther)
+		return
+	}
 	if err := s.Templates.ExecuteTemplate(w, "start.html", nil); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -78,6 +83,12 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	http.SetCookie(w, &http.Cookie{
+		Name:   "national_id",
+		Value:  u.NationalID,
+		Path:   "/",
+		MaxAge: int((365 * 24 * time.Hour).Seconds()),
+	})
 	http.Redirect(w, r, "/chat/"+u.NationalID, http.StatusSeeOther)
 }
 
