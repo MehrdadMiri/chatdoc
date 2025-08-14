@@ -52,7 +52,9 @@ waitroom-chatbot/
    ```
 
 2. **Configure the environment**: Copy `.env.example` to `.env` and fill in
-   your database URL and OpenAI API key.  A sample `.env.example` is provided.
+   your database URL and OpenAI API key.  The example configuration uses the
+   default credentials from `docker-compose.yml`
+   (`postgres://postgres:postgres@localhost:5432/chatdoc?sslmode=disable`).
 
 3. **Run the server**: Use the Makefile to build and run the server:
 
