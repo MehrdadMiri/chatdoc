@@ -12,13 +12,22 @@ CREATE TABLE IF NOT EXISTS sessions (
     user_agent TEXT
 );
 
+-- users: persistent patient records keyed by national ID.
+CREATE TABLE IF NOT EXISTS users (
+    national_id TEXT PRIMARY KEY,
+    phone TEXT NOT NULL,
+    name TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- messages: chat transcript entries for a session.  The role column
 -- distinguishes between patient and bot messages.
 CREATE TYPE message_role AS ENUM ('patient', 'bot');
 
 CREATE TABLE IF NOT EXISTS messages (
     id BIGSERIAL PRIMARY KEY,
-    session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    session_id UUID REFERENCES sessions(id) ON DELETE CASCADE,
+    national_id TEXT REFERENCES users(national_id),
     role message_role NOT NULL,
     content TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

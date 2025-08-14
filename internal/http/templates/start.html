@@ -1,0 +1,19 @@
+{{ define "start" }}
+<!doctype html>
+<html lang="fa">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>شروع گفتگو</title>
+</head>
+<body style="font-family: sans-serif; direction: rtl; max-width: 400px; margin: 2rem auto;">
+  <h1>شروع گفتگو</h1>
+  <form action="/start" method="post">
+    <label>نام:<br><input type="text" name="name" required></label><br><br>
+    <label>کد ملی:<br><input type="text" name="national_id" required></label><br><br>
+    <label>شماره تلفن:<br><input type="text" name="phone" required></label><br><br>
+    <button type="submit">شروع</button>
+  </form>
+</body>
+</html>
+{{ end }}
