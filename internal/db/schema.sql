@@ -38,9 +38,10 @@ CREATE TABLE IF NOT EXISTS messages (
 -- described in the specification.
 CREATE TABLE IF NOT EXISTS summaries (
     id BIGSERIAL PRIMARY KEY,
-    session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE UNIQUE,
+    session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     key_points JSONB NOT NULL,
     structured JSONB NOT NULL,
     free_text TEXT NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (session_id)
 );
