@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- messages: chat transcript entries for a session.  The role column
 -- distinguishes between patient and bot messages.
-CREATE TYPE message_role AS ENUM ('patient', 'bot');
+CREATE TYPE IF NOT EXISTS message_role AS ENUM ('patient', 'bot');
 
 CREATE TABLE IF NOT EXISTS messages (
     id BIGSERIAL PRIMARY KEY,

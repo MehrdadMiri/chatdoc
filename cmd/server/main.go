@@ -42,6 +42,9 @@ func main() {
 	if err := dbConn.PingContext(ctx); err != nil {
 		log.Fatalf("failed to ping database: %v", err)
 	}
+	if err := db.Migrate(context.Background(), dbConn); err != nil {
+		log.Fatalf("failed to run migrations: %v", err)
+	}
 	repo := db.NewRepository(dbConn)
 	// Initialize LLM client (stub)
 	llmClient := llm.NewOpenAIClient()
