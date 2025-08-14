@@ -25,7 +25,11 @@
 </head>
 <body>
   <div class="wrap">
-    <div id="messages" class="messages"></div>
+    <div id="messages" class="messages">
+      {{ range .Transcript }}
+        <div class="msg {{ .Role }}">{{ .Content }}</div>
+      {{ end }}
+    </div>
 
     <form id="chatForm"
           class="composer"
@@ -75,6 +79,9 @@
       document.getElementById('messages').appendChild(err);
       scrollToBottom();
     });
+
+    // Scroll to the latest message on initial load
+    scrollToBottom();
   </script>
 </body>
 </html>
