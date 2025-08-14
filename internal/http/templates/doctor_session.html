@@ -1,0 +1,21 @@
+{{ define "doctor_session" }}
+<div hx-sse="connect:/api/doctor/sessions/{{ .Session.ID }}/stream swap:summary_update" class="doctor-session">
+  <h2>جلسه {{ .Session.ID }}</h2>
+  <div class="summary">
+    <h3>نکات کلیدی</h3>
+    <ul>
+      {{ range .Summary.KeyPoints }}<li>{{ . }}</li>{{ end }}
+    </ul>
+    <h3>خلاصهٔ آزاد</h3>
+    <p>{{ .Summary.FreeText }}</p>
+  </div>
+  <div class="transcript">
+    <h3>گفت‌وگو</h3>
+    <ul>
+      {{ range .Transcript }}
+      <li><strong>{{ .Role }}:</strong> {{ .Content }}</li>
+      {{ end }}
+    </ul>
+  </div>
+</div>
+{{ end }}

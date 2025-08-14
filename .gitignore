@@ -1,0 +1,41 @@
+# Binaries
+/bin/
+/build/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+
+# Go build cache & module cache
+*.out
+*.log
+go.sum
+vendor/
+
+# IDE/editor junk
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment & config
+.env
+.env.*
+!*.env.example
+
+# OS-specific clutter
+.DS_Store
+Thumbs.db
+
+# Database files (if you run local Postgres inside project)
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated files
+waitroom-chatbot.zip
+migrations/*.tmp

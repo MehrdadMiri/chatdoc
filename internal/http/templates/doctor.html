@@ -1,0 +1,41 @@
+{{ define "doctor" }}
+<!doctype html>
+<html lang="fa">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>پنل پزشک</title>
+  <script src="https://unpkg.com/htmx.org@1.9.4"></script>
+  <script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
+  <style>
+    body { font-family: sans-serif; direction: rtl; }
+    .container { display: flex; padding: 1rem; gap: 1rem; }
+    .sessions { width: 30%; border: 1px solid #ddd; padding: 1rem; height: 90vh; overflow-y: auto; }
+    .details { width: 70%; border: 1px solid #ddd; padding: 1rem; height: 90vh; overflow-y: auto; }
+    .session-link { display: block; padding: .5rem; border-bottom: 1px solid #eee; text-decoration: none; color: inherit; }
+    .session-link:hover { background: #f0f0f0; }
+    .summary { margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>پنل پزشک</h1>
+  <div class="container">
+    <div class="sessions">
+      <h2>نوبت‌های فعال</h2>
+      {{ range .Sessions }}
+      <a class="session-link" hx-get="/doctor/sessions/{{ .SessionID }}" hx-target=".details" hx-swap="innerHTML">
+        <div><strong>Session‑{{ .SessionID }}</strong></div>
+        <div>{{ range .KeyPoints }}<span>{{ . }}</span><br>{{ end }}</div>
+        <div style="font-size: .8rem; color: #666;">آخرین به‌روزرسانی: {{ .UpdatedAt }}</div>
+      </a>
+      {{ else }}
+      <p>هیچ نوبت فعالی وجود ندارد.</p>
+      {{ end }}
+    </div>
+    <div class="details">
+      <p>برای مشاهدهٔ خلاصه، یک جلسه را انتخاب کنید.</p>
+    </div>
+  </div>
+</body>
+</html>
+{{ end }}
