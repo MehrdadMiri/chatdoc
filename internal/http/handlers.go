@@ -130,7 +130,7 @@ func (s *Server) handlePostMessage(w http.ResponseWriter, r *http.Request, natio
 	if count >= s.MessageCap {
 		// send cap message only
 		botMsg, _ := s.Repo.CreateMessage(r.Context(), nationalID, pkg.RoleBot, core.CapMessage)
-		w.Write([]byte(`<div class="message bot">` + botMsg.Content + `</div>`))
+		w.Write([]byte(`<div class="message bot">` + template.HTMLEscapeString(botMsg.Content) + `</div>`))
 		return
 	}
 	// store patient message
@@ -143,5 +143,7 @@ func (s *Server) handlePostMessage(w http.ResponseWriter, r *http.Request, natio
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Write([]byte(`<div class="message bot">` + reply + `</div>`))
+	escContent := template.HTMLEscapeString(content)
+	escReply := template.HTMLEscapeString(reply)
+	w.Write([]byte(`<div class="message patient">` + escContent + `</div><div class="message bot">` + escReply + `</div>`))
 }

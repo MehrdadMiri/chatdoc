@@ -24,8 +24,9 @@
       <div class="message {{ .Role }}">{{ .Content }}</div>
       {{ end }}
     </div>
-    <form hx-post="/api/users/{{ .NationalID }}/messages" hx-swap="beforeend" hx-target="#messages">
-      <input name="content" type="text" autocomplete="off" placeholder="پیام خود را بنویسید" />
+    <form hx-post="/api/users/{{ .NationalID }}/messages" hx-swap="beforeend" hx-target="#messages" hx-on::after-request="this.reset()">
+      <input name="content" type="text" autocomplete="off" placeholder="پیام خود را بنویسید" onkeydown="if(event.key==='Enter'){this.form.requestSubmit();event.preventDefault();}" />
+      <button type="submit">ارسال</button>
     </form>
   </div>
   <script>
