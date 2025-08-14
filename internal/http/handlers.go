@@ -59,7 +59,7 @@ func (s *Server) handleStartPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/chat/"+c.Value, http.StatusSeeOther)
 		return
 	}
-	if err := s.Templates.ExecuteTemplate(w, "start.html", nil); err != nil {
+	if err := s.Templates.ExecuteTemplate(w, "start", nil); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -100,13 +100,15 @@ func (s *Server) handleChatPage(w http.ResponseWriter, r *http.Request, national
 		return
 	}
 	data := struct {
-		NationalID string
+		SessionID  string // template expects .SessionID
+		NationalID string // keep for any other template usage
 		Transcript []pkg.Message
 	}{
+		SessionID:  nationalID,
 		NationalID: nationalID,
 		Transcript: transcript,
 	}
-	if err := s.Templates.ExecuteTemplate(w, "patient.html", data); err != nil {
+	if err := s.Templates.ExecuteTemplate(w, "patient", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -130,6 +132,7 @@ func (s *Server) handlePostMessage(w http.ResponseWriter, r *http.Request, natio
 	if count >= s.MessageCap {
 		// send cap message only
 		botMsg, _ := s.Repo.CreateMessage(r.Context(), nationalID, pkg.RoleBot, core.CapMessage)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write([]byte(`<div class="message bot">` + template.HTMLEscapeString(botMsg.Content) + `</div>`))
 		return
 	}
@@ -144,5 +147,6 @@ func (s *Server) handlePostMessage(w http.ResponseWriter, r *http.Request, natio
 		return
 	}
 	escReply := template.HTMLEscapeString(reply)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(`<div class="message bot">` + escReply + `</div>`))
 }

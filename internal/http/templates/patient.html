@@ -1,62 +1,81 @@
-{{ define "patient.html" }}
+{{ define "patient" }}
 <!doctype html>
-<html lang="fa">
+<html lang="fa" dir="rtl">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>گفت‌وگوی بیمار</title>
-    <script src="https://unpkg.com/htmx.org@1.9.4"></script>
-    <style>
-      body { font-family: sans-serif; font-size: 1.2rem; line-height: 1.6; direction: rtl; background:#f0f4f8; }
-      .chat-box { max-width: 600px; margin: 2rem auto; padding: 1rem; background:#fff; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); }
-      .messages { height: 60vh; overflow-y: auto; border: 1px solid #ddd; padding: 1rem; margin-bottom: 1rem; background: #fafafa; border-radius:4px; }
-      .message { margin-bottom: .5rem; padding:.5rem .75rem; border-radius:6px; max-width:90%; }
-      .message.bot { background:#e7f1ff; color:#0a558d; }
-      .message.patient { background:#e6f5ec; color:#0a843a; text-align: right; margin-left:auto; }
-      input[type="text"] { width: 100%; padding: .5rem; font-size: 1rem; border:1px solid #ccc; border-radius:4px; }
-      button { margin-top:.5rem; padding:.5rem 1rem; font-size:1rem; background:#0a558d; color:#fff; border:none; border-radius:4px; cursor:pointer; }
-      button:disabled { background:#999; cursor:not-allowed; }
-    </style>
+  <script src="https://unpkg.com/htmx.org@1.9.4"></script>
+  <style>
+    body { font-family: sans-serif; font-size: 1.1rem; background:#fafafa; margin:0; }
+    .wrap { max-width:720px; margin:0 auto; padding:1rem; }
+    .messages { display:flex; flex-direction:column; gap:.5rem; padding-bottom:6rem; }
+    .msg { max-width:85%; padding:.6rem .8rem; border-radius:12px; line-height:1.6; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.06); }
+    .msg.patient { background:#e8f4ff; align-self:flex-start; }
+    .msg.bot { background:#f1f1f1; align-self:flex-end; }
+    .msg.error { background:#ffe9e9; border:1px solid #f3b3b3; color:#b00000; }
+    .composer { position:fixed; right:0; left:0; bottom:0; background:#fff; border-top:1px solid #eee; }
+    .composer .inner { max-width:720px; margin:0 auto; display:flex; gap:.5rem; padding:.6rem; }
+    input[type=text] { flex:1; padding:.6rem .8rem; font-size:1.05rem; border:1px solid #ddd; border-radius:10px; }
+    button { min-width:96px; padding:.6rem .9rem; border:0; border-radius:10px; font-size:1rem; background:#0b74de; color:#fff; cursor:pointer; }
+    button[disabled] { opacity:.6; cursor:not-allowed; }
+    .spinner { display:none; margin-inline-start:.5rem; }
+    .htmx-request .spinner { display:inline-block; }
+  </style>
 </head>
 <body>
-  <div class="chat-box" hx-boost="true">
-    <h1>گفت‌وگوی بیمار</h1>
-    <div id="messages" class="messages">
-      {{ range .Transcript }}
-      <div class="message {{ .Role }}">{{ .Content }}</div>
-      {{ end }}
-    </div>
-      <form id="chat-form" hx-post="/api/users/{{ .NationalID }}/messages" hx-swap="beforeend" hx-target="#messages" hx-disabled-elt="#send-btn" hx-on::after-request="this.reset()" hx-on::before-request="appendUserMessage(this)">
-        <input name="content" type="text" autocomplete="off" placeholder="پیام خود را بنویسید" onkeydown="if(event.key==='Enter'){this.form.requestSubmit();event.preventDefault();}" />
-        <button id="send-btn" type="submit">ارسال</button>
-      </form>
+  <div class="wrap">
+    <div id="messages" class="messages"></div>
+
+    <form id="chatForm"
+          class="composer"
+          hx-post="/api/sessions/{{ .SessionID }}/messages"
+          hx-trigger="submit"
+          hx-target="#messages"
+          hx-swap="beforeend"
+          hx-disabled-elt="#sendBtn"
+          hx-vals='js:{ content: document.getElementById("inputMsg").value }'
+          hx-on::before-request="window.__lastMsg = inputMsg.value; appendPatientBubble(); inputMsg.value='';"
+          hx-on::after-request="scrollToBottom();">
+
+      <div class="inner">
+        <input id="inputMsg" type="text" name="content" autocomplete="off" required placeholder="پیام خود را بنویسید…" />
+        <button id="sendBtn" type="submit">ارسال</button>
+        <span class="spinner">…</span>
+      </div>
+    </form>
   </div>
-    <script>
-      // Auto scroll to bottom on new messages
-      document.body.addEventListener('htmx:afterSwap', function(evt) {
-        if (evt.target.id === 'messages') {
-          evt.target.scrollTop = evt.target.scrollHeight;
-        }
-      });
 
-      function appendUserMessage(form){
-        var input = form.querySelector('input[name="content"]');
-        var text = input.value.trim();
-        if(text === ''){ return; }
-        var msgs = document.getElementById('messages');
-        var div = document.createElement('div');
-        div.className = 'message patient';
-        div.textContent = text;
-        msgs.appendChild(div);
-        msgs.scrollTop = msgs.scrollHeight;
-      }
+  <script>
+    function scrollToBottom() {
+      const list = document.getElementById('messages');
+      list.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+    function appendPatientBubble() {
+      const txt = (window.__lastMsg || '').trim();
+      if (!txt) return;
+      const div = document.createElement('div');
+      div.className = 'msg patient';
+      div.textContent = txt;
+      document.getElementById('messages').appendChild(div);
+    }
 
-      document.getElementById('chat-form').addEventListener('htmx:sendError', function(){
-        var btn = document.getElementById('send-btn');
-        btn.disabled = true;
-        setTimeout(function(){ btn.disabled = false; }, 5000);
-      });
-    </script>
+    // Error handling: keep patient bubble (already appended) and show an error bubble
+    document.body.addEventListener('htmx:responseError', function (e) {
+      const err = document.createElement('div');
+      err.className = 'msg bot error';
+      err.textContent = 'خطا در پاسخ‌دهی. لطفاً دوباره تلاش کنید.';
+      document.getElementById('messages').appendChild(err);
+      scrollToBottom();
+    });
+    document.body.addEventListener('htmx:sendError', function (e) {
+      const err = document.createElement('div');
+      err.className = 'msg bot error';
+      err.textContent = 'ارتباط برقرار نشد. اینترنت را بررسی کنید و دوباره تلاش کنید.';
+      document.getElementById('messages').appendChild(err);
+      scrollToBottom();
+    });
+  </script>
 </body>
 </html>
 {{ end }}
