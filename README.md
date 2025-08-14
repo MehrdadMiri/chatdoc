@@ -64,9 +64,10 @@ waitroom-chatbot/
 
    This will start an HTTP server on `:8080` by default.
 
-4. **Apply database migrations**: The `migrations/001_initial.sql` file contains
-   the SQL required to create the initial tables.  You can apply this manually
-   or integrate it into your preferred migration tool.
+4. **Database setup**: The server applies the schema in `internal/db/schema.sql`
+   on startup so the required tables are created automatically. The same SQL is
+   also available in `migrations/001_initial.sql` if you prefer to manage
+   migrations with an external tool.
 
 ### Why Server‑Sent Events (SSE)?
 
