@@ -48,6 +48,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		http.NotFound(w, r)
+	case r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/api/sessions/") && strings.HasSuffix(r.URL.Path, "/messages"):
+		parts := strings.Split(r.URL.Path, "/")
+		if len(parts) >= 4 {
+			nationalID := parts[3]
+			s.handlePostMessage(w, r, nationalID)
+			return
+		}
+		http.NotFound(w, r)
 	default:
 		http.NotFound(w, r)
 	}
@@ -91,6 +99,11 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 	})
 	http.Redirect(w, r, "/chat/"+u.NationalID, http.StatusSeeOther)
 }
+
+// GetTranscriptSince returns the transcript for a nationalID but only messages
+// with created_at >= since. It reuses GetTranscript and filters in-memory to
+// avoid coupling to any specific SQL shape used by GetTranscript.
+// Moved to db/repository.go
 
 // handleChatPage renders the chat interface for a user.
 func (s *Server) handleChatPage(w http.ResponseWriter, r *http.Request, nationalID string) {
@@ -141,7 +154,19 @@ func (s *Server) handlePostMessage(w http.ResponseWriter, r *http.Request, natio
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	reply, _ := s.Chat.Reply(r.Context(), nationalID, content)
+	// Build LLM reply using last week's transcript for context
+	since := time.Now().AddDate(0, 0, -7)
+	ctxTranscript, err := s.Repo.GetTranscriptSince(r.Context(), nationalID, since)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	reply, err := s.Chat.ReplyWithContext(r.Context(), nationalID, content, ctxTranscript)
+	if err != nil {
+		// Trigger HTMX error bubble; patient bubble already appended client-side
+		http.Error(w, "llm error", http.StatusBadGateway)
+		return
+	}
 	if _, err := s.Repo.CreateMessage(r.Context(), nationalID, pkg.RoleBot, reply); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

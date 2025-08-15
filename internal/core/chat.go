@@ -2,15 +2,14 @@ package core
 
 import (
 	"context"
-	"fmt"
 
 	"waitroom-chatbot/internal/llm"
+	"waitroom-chatbot/pkg"
 )
 
-// ChatService orchestrates the chat between a patient and the assistant.  In
-// a real implementation this would use the OpenAI API (or another LLM) to
-// generate a reply.  The MVP keeps stateful context in the database and
-// generates a response for each patient message.
+// ChatService orchestrates patient chat with an LLM backend.
+// It builds a Persian system prompt and passes recent transcript
+// (mapped to OpenAI-style roles) plus the latest user message.
 type ChatService struct {
 	LLM llm.Client
 }
@@ -20,19 +19,33 @@ func NewChatService(client llm.Client) *ChatService {
 	return &ChatService{LLM: client}
 }
 
-// Reply generates a reply in Persian for a patient message.  This is a
-// blocking call that delegates to the LLM.  On error a generic fallback
-// message is returned.  The nationalID parameter can be used by callers to
-// fetch previous messages, but it is not used here.
+// Reply is kept for backward compatibility; it delegates to ReplyWithContext
+// with no history.
 func (s *ChatService) Reply(ctx context.Context, nationalID string, message string) (string, error) {
-	// Compose the prompt for the LLM.  In a full implementation you would
-	// include the entire conversation history and system prompt.  Here we
-	// simply pass the system prompt and the user message to a stubbed client.
-	prompt := fmt.Sprintf("%s\n\nPatient: %s\n\nAssistant:", SystemPrompt, message)
-	resp, err := s.LLM.Chat(ctx, prompt)
-	if err != nil {
-		// fallback generic response when the LLM call fails
-		return "از توضیحات شما متشکرم. لطفاً کمی بیشتر دربارهٔ مشکل خود بگویید.", err
+	return s.ReplyWithContext(ctx, nationalID, message, nil)
+}
+
+// ReplyWithContext generates a reply using the last week's transcript provided
+// by the caller (history). The history should be in chronological order.
+func (s *ChatService) ReplyWithContext(ctx context.Context, nationalID, lastUserMsg string, history []pkg.Message) (string, error) {
+	var msgs []llm.Message
+
+	// System prompt (Persian) guiding tone & behavior.
+	msgs = append(msgs, llm.Message{Role: "system", Content: SystemPrompt})
+
+	// Add prior transcript as alternating user/assistant messages.
+	for _, m := range history {
+		role := "user"
+		if m.Role == pkg.RoleBot {
+			role = "assistant"
+		}
+		msgs = append(msgs, llm.Message{Role: role, Content: m.Content})
 	}
-	return resp, nil
+
+	// Current patient message last.
+	msgs = append(msgs, llm.Message{Role: "user", Content: lastUserMsg})
+
+	// Delegate to LLM. On error we return it so the HTTP handler can surface
+	// a proper 502 and the UI can show an error bubble.
+	return s.LLM.Chat(ctx, msgs)
 }

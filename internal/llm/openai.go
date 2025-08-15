@@ -2,15 +2,23 @@ package llm
 
 import (
 	"context"
+	"errors"
 	"os"
 
 	openai "github.com/sashabaranov/go-openai"
 )
 
-// Client defines the methods required by the chat and summariser.  An
-// implementation could call the OpenAI API or any other LLM provider.
+// Message is a minimal chat message used by the core chat service.
+// Role must be one of: "system", "user", or "assistant".
+type Message struct {
+	Role    string
+	Content string
+}
+
+// Client defines the methods required by the chat and summariser.
+// Chat accepts the full message history (system + prior turns + latest user).
 type Client interface {
-	Chat(ctx context.Context, prompt string) (string, error)
+	Chat(ctx context.Context, messages []Message) (string, error)
 	Summarize(ctx context.Context, prompt string) (string, error)
 }
 
@@ -22,7 +30,7 @@ type OpenAIClient struct {
 	summaryModel string
 }
 
-// NewOpenAIClient constructs an OpenAI-backed LLM client.  It reads the API key
+// NewOpenAIClient constructs an OpenAI-backed LLM client. It reads the API key
 // and model names from the environment and falls back to sensible defaults.
 func NewOpenAIClient() *OpenAIClient {
 	apiKey := os.Getenv("OPENAI_API_KEY")
@@ -30,7 +38,8 @@ func NewOpenAIClient() *OpenAIClient {
 
 	chatModel := os.Getenv("OPENAI_MODEL_CHAT")
 	if chatModel == "" {
-		chatModel = openai.GPT3Dot5Turbo
+		// default to a modern small model; can be overridden via env
+		chatModel = "gpt-4o-mini"
 	}
 	summaryModel := os.Getenv("OPENAI_MODEL_SUMMARY")
 	if summaryModel == "" {
@@ -44,14 +53,28 @@ func NewOpenAIClient() *OpenAIClient {
 	}
 }
 
-// Chat sends the prompt to the OpenAI chat completion API and returns the
-// model's response.
-func (c *OpenAIClient) Chat(ctx context.Context, prompt string) (string, error) {
+// Chat sends the message history to the OpenAI chat completion API and returns
+// the assistant's response.
+func (c *OpenAIClient) Chat(ctx context.Context, messages []Message) (string, error) {
+	if c.client == nil {
+		return "", errors.New("openai client not initialized")
+	}
+
+	// Convert to OpenAI message type
+	oaMsgs := make([]openai.ChatCompletionMessage, 0, len(messages))
+	for _, m := range messages {
+		role := m.Role
+		if role != openai.ChatMessageRoleSystem && role != openai.ChatMessageRoleUser && role != openai.ChatMessageRoleAssistant {
+			// coerce anything unknown to user
+			role = openai.ChatMessageRoleUser
+		}
+		oaMsgs = append(oaMsgs, openai.ChatCompletionMessage{Role: role, Content: m.Content})
+	}
+
 	resp, err := c.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
-		Model: c.chatModel,
-		Messages: []openai.ChatCompletionMessage{
-			{Role: openai.ChatMessageRoleUser, Content: prompt},
-		},
+		Model:       c.chatModel,
+		Messages:    oaMsgs,
+		Temperature: 0.2,
 	})
 	if err != nil {
 		return "", err
@@ -70,6 +93,7 @@ func (c *OpenAIClient) Summarize(ctx context.Context, prompt string) (string, er
 			{Role: openai.ChatMessageRoleSystem, Content: "Summarize the following in Persian:"},
 			{Role: openai.ChatMessageRoleUser, Content: prompt},
 		},
+		Temperature: 0.2,
 	})
 	if err != nil {
 		return "", err

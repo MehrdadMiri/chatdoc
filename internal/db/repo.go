@@ -3,8 +3,12 @@ package db
 import (
 	"context"
 	"database/sql"
-
+	"errors"
+	"fmt"
+	"time"
 	"waitroom-chatbot/pkg"
+
+	"github.com/google/uuid"
 )
 
 // Repository wraps database operations for users and messages.
@@ -17,24 +21,46 @@ type Repository struct {
 // The caller is responsible for managing the DB connection lifecycle.
 func NewRepository(db *sql.DB) *Repository { return &Repository{DB: db} }
 
-// UpsertUser creates or updates a user identified by national ID.
+// UpsertUser creates or updates a session for the user identified by national ID.
 func (r *Repository) UpsertUser(ctx context.Context, u *pkg.User) error {
-	_, err := r.DB.ExecContext(ctx,
-		`INSERT INTO users (national_id, phone, name)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (national_id) DO UPDATE
-           SET phone = EXCLUDED.phone,
-               name  = EXCLUDED.name`,
-		u.NationalID, u.Phone, u.Name,
+	// Try to update the latest session with this national ID
+	res, err := r.DB.ExecContext(ctx,
+		`UPDATE sessions
+         SET patient_phone = $1, patient_name = $2
+         WHERE patient_national_id = $3`,
+		u.Phone, u.Name, u.NationalID,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		// Insert new session
+		newID := uuid.New()
+		_, err := r.DB.ExecContext(ctx,
+			`INSERT INTO sessions (id, patient_national_id, patient_phone, patient_name)
+             VALUES ($1, $2, $3, $4)`,
+			newID, u.NationalID, u.Phone, u.Name,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-// GetUser retrieves a user by national ID.
+// GetUser retrieves the most recent session for a user by national ID.
 func (r *Repository) GetUser(ctx context.Context, nationalID string) (*pkg.User, error) {
 	var u pkg.User
 	err := r.DB.QueryRowContext(ctx,
-		`SELECT national_id, phone, name, created_at FROM users WHERE national_id = $1`,
+		`SELECT patient_national_id, patient_phone, patient_name, created_at
+         FROM sessions
+         WHERE patient_national_id = $1
+         ORDER BY created_at DESC
+         LIMIT 1`,
 		nationalID,
 	).Scan(&u.NationalID, &u.Phone, &u.Name, &u.CreatedAt)
 	if err != nil {
@@ -45,27 +71,42 @@ func (r *Repository) GetUser(ctx context.Context, nationalID string) (*pkg.User,
 
 // CreateMessage stores a new message for the given national ID.
 func (r *Repository) CreateMessage(ctx context.Context, nationalID string, role pkg.MessageRole, content string) (*pkg.Message, error) {
-	var m pkg.Message
+	// Find the latest session ID for this nationalID
+	var sessionID uuid.UUID
 	err := r.DB.QueryRowContext(ctx,
-		`INSERT INTO messages (national_id, role, content)
+		`SELECT id FROM sessions
+         WHERE patient_national_id = $1
+         ORDER BY created_at DESC
+         LIMIT 1`, nationalID).Scan(&sessionID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("no session found for national ID %s", nationalID)
+		}
+		return nil, err
+	}
+	var m pkg.Message
+	err = r.DB.QueryRowContext(ctx,
+		`INSERT INTO messages (session_id, role, content)
          VALUES ($1, $2, $3)
-         RETURNING id, national_id, role, content, created_at`,
-		nationalID, role, content,
-	).Scan(&m.ID, &m.NationalID, &m.Role, &m.Content, &m.CreatedAt)
+         RETURNING id, role, content, created_at`,
+		sessionID, role, content,
+	).Scan(&m.ID, &m.Role, &m.Content, &m.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
+	m.NationalID = nationalID
 	return &m, nil
 }
 
 // GetTranscript returns messages from the last week for a user ordered by creation time.
 func (r *Repository) GetTranscript(ctx context.Context, nationalID string) ([]pkg.Message, error) {
 	rows, err := r.DB.QueryContext(ctx,
-		`SELECT id, national_id, role, content, created_at
-         FROM messages
-         WHERE national_id = $1
-           AND created_at >= NOW() - INTERVAL '7 days'
-         ORDER BY created_at ASC`, nationalID)
+		`SELECT m.id, s.patient_national_id, m.role, m.content, m.created_at
+         FROM messages m
+         JOIN sessions s ON m.session_id = s.id
+         WHERE s.patient_national_id = $1
+           AND m.created_at >= NOW() - INTERVAL '7 days'
+         ORDER BY m.created_at ASC`, nationalID)
 	if err != nil {
 		return nil, err
 	}
@@ -86,10 +127,30 @@ func (r *Repository) GetTranscript(ctx context.Context, nationalID string) ([]pk
 func (r *Repository) CountUserMessagesThisWeek(ctx context.Context, nationalID string) (int, error) {
 	var count int
 	err := r.DB.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM messages
-         WHERE national_id = $1 AND role = 'patient'
-           AND created_at >= date_trunc('week', NOW())`,
+		`SELECT COUNT(*)
+         FROM messages m
+         JOIN sessions s ON m.session_id = s.id
+         WHERE s.patient_national_id = $1
+           AND m.role = 'patient'
+           AND m.created_at >= date_trunc('week', NOW())`,
 		nationalID,
 	).Scan(&count)
 	return count, err
+}
+
+// GetTranscriptSince returns the transcript for a nationalID but only messages
+// with created_at >= since. It reuses GetTranscript and filters in-memory to
+// avoid coupling to any specific SQL shape used by GetTranscript.
+func (r *Repository) GetTranscriptSince(ctx context.Context, nationalID string, since time.Time) ([]pkg.Message, error) {
+	all, err := r.GetTranscript(ctx, nationalID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]pkg.Message, 0, len(all))
+	for _, m := range all {
+		if m.CreatedAt.After(since) || m.CreatedAt.Equal(since) {
+			out = append(out, m)
+		}
+	}
+	return out, nil
 }

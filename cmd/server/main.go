@@ -46,7 +46,7 @@ func main() {
 		log.Fatalf("failed to run migrations: %v", err)
 	}
 	repo := db.NewRepository(dbConn)
-	// Initialize LLM client (stub)
+	// Initialize OpenAI LLM client (uses env: OPENAI_API_KEY, OPENAI_MODEL_CHAT)
 	llmClient := llm.NewOpenAIClient()
 	chatService := core.NewChatService(llmClient)
 	// Create HTTP server
